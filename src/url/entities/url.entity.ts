@@ -1,10 +1,13 @@
-import { Collection } from 'fireorm';
+import {Timestamp} from '@google-cloud/firestore';
+import {Collection} from 'fireorm';
 
 @Collection('urls')
 export class Url {
-  id: string;
+	id: string;
 
-  originalUrl: string;
+	originalUrl: string;
 
-  shortCode: string;
+	shortCode: string;
+
+	expiresAt: Timestamp;
 }
