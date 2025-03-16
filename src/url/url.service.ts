@@ -1,4 +1,4 @@
-import {Injectable, Logger} from '@nestjs/common';
+import {Injectable} from '@nestjs/common';
 import {Url} from './entities/url.entity.js';
 import {InjectRepository} from 'nestjs-fireorm';
 import {nanoid} from 'nanoid';
