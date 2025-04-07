@@ -1,0 +1,34 @@
+name: 'CI flows'
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: 'unified-skein-453820-a1'
+  ID_PROVIDER: 'https://iam.googleapis.com/projects/199604812910/locations/global/workloadIdentityPools/gha-pool/providers/gha-provider'
+  REGISTRY: 'us-central1-docker.pkg.dev'
+  SERVICE_NAME: 'url-shortener'
+  REGION: 'us-central1'
+
+jobs:
+  test:
+    name: 'Test'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: 'Install dependencies'
+        run: npm install
+      - name: 'Run tests'
+        run: npm test
