@@ -1,0 +1,67 @@
+name: 'CI flows'
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: 'unified-skein-453820-a1'
+  ID_PROVIDER: 'https://iam.googleapis.com/projects/199604812910/locations/global/workloadIdentityPools/gha-pool/providers/gha-provider'
+  REGISTRY: 'us-central1-docker.pkg.dev'
+  SERVICE_NAME: 'url-shortener'
+  REGION: 'us-central1'
+
+jobs:
+  test:
+    name: 'Test'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: 'Install dependencies'
+        run: npm install
+      - name: 'Run tests'
+        run: npm test
+  build-deploy:
+    name: 'Build and Deploy'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'feature/docker'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: 'google-github-actions/auth@v2'
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.ID_PROVIDER }}
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: 'Install dependencies'
+        run: npm install
+      - name: 'Build'
+        run: npm run build
+      - name: Configure Docker to use Google Cloud
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+      - name: 'Build and push Docker image'
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }} .
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}
+      - name: 'Deploy to Cloud Run'
+        run: |
+          gcloud run deploy $SERVICE_NAME \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region $REGION \
+            --allow-unauthenticated --service-account url-shortener@unified-skein-453820-a1.iam.gserviceaccount.com
