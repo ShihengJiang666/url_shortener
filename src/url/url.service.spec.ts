@@ -6,24 +6,52 @@ import {Timestamp} from '@google-cloud/firestore';
 import * as nanoidModule from 'nanoid';
 import dayjs from 'dayjs';
 import {getRepositoryToken} from 'nestjs-fireorm';
+import {RedisService} from '../cores/modules/index.js';
+import {RedisRepository} from '../cores/modules/redis/repository/redis.repository.js';
 
 describe('UrlService', () => {
 	let service: UrlService;
 	let mockRepository: jest.Mocked<BaseFirestoreRepository<Url>>;
+	let redisGet: jest.Mock;
+	let redisExists: jest.Mock;
+	let redisSave: jest.Mock;
 
 	const originalEnv = process.env;
 
 	beforeEach(async () => {
+		process.env.NODE_ENV = 'local';
 		process.env = {...originalEnv};
 		process.env.PORT = '3000';
+		redisExists = jest.fn();
+		redisSave = jest.fn();
+		redisGet = jest.fn();
 
 		mockRepository = {
 			create: jest.fn(),
 			findById: jest.fn(),
 		} as unknown as jest.Mocked<BaseFirestoreRepository<Url>>;
+		const mockRedisService = {
+			exists: redisExists,
+			save: redisSave,
+			get: redisGet,
+		} as unknown as jest.Mocked<RedisService>;
+		const mockRedisRepository = {
+			get: jest.fn(),
+			set: jest.fn(),
+			exists: jest.fn(),
+			setWithExpiry: jest.fn(),
+		} as unknown as jest.Mocked<RedisRepository>;
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
+				{
+					provide: RedisService,
+					useValue: mockRedisService,
+				},
+				{
+					provide: RedisRepository,
+					useValue: mockRedisRepository,
+				},
 				UrlService,
 				{
 					provide: getRepositoryToken(Url),
@@ -77,10 +105,14 @@ describe('UrlService', () => {
 	});
 
 	describe('getOriginalUrl', () => {
-		it('should return the original URL when short code exists', async () => {
-			// Arrange
+		afterEach(() => {
+			jest.clearAllMocks();
+		});
+
+		it('should return the original URL when short code exists in db but not in cache', async () => {
 			const shortCode = 'abc123';
 			const expectedUrl = 'https://example.com/long-url';
+			redisExists.mockResolvedValue(false);
 			mockRepository.findById.mockResolvedValue({
 				originalUrl: expectedUrl,
 				shortCode,
@@ -93,9 +125,21 @@ describe('UrlService', () => {
 			expect(mockRepository.findById).toHaveBeenCalledWith(shortCode);
 			expect(result).toBe(expectedUrl);
 		});
+		it('should return the original URL when short code exists in cache', async () => {
+			const shortCode = 'abc123';
+			const expectedUrl = 'https://example.com/long-url';
+			redisExists.mockResolvedValue(true);
+			redisGet.mockResolvedValue(expectedUrl);
+
+			const result = await service.getOriginalUrl(shortCode);
+
+			expect(redisGet).toHaveBeenCalledWith(shortCode);
+			expect(result).toBe(expectedUrl);
+		});
 
 		it('should return null when short code does not exist', async () => {
 			const shortCode = 'notfound';
+			redisExists.mockResolvedValue(false);
 			mockRepository.findById.mockResolvedValue(null as unknown as Url);
 
 			const result = await service.getOriginalUrl(shortCode);

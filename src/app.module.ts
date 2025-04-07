@@ -4,7 +4,7 @@ import {AppController} from './app.controller.js';
 import {AppService} from './app.service.js';
 import {UrlModule} from './url/url.module.js';
 import {ConfigModule} from '@nestjs/config';
-
+import {RedisModule} from './cores/modules/redis/redis.module.js';
 @Module({
 	imports: [
 		FireormModule.forRoot({
@@ -13,6 +13,7 @@ import {ConfigModule} from '@nestjs/config';
 		}),
 		ConfigModule.forRoot(),
 		UrlModule,
+		RedisModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
